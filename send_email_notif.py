@@ -92,6 +92,15 @@ async def process_message(message):
     # If all retries fail, send the message to the DLQ
     logging.error(f"Failed to send email after {max_retries} retries, sending to DLQ")
     event_payload['retry_count_email'] = retry_count
+    
+    # Update DynamoDB with failed status
+    dynamodb_table.update_item(
+        Key={'event_id': event_id},
+        UpdateExpression='SET #status = :status',
+        ExpressionAttributeNames={'#status': 'status'},
+        ExpressionAttributeValues={':status': EventStatus.FAILED}
+    )
+    
     sqs_client.send_message(QueueUrl=DLQ_URL, MessageBody=json.dumps(event_payload))
 
 async def listen_to_sqs_with_priority():

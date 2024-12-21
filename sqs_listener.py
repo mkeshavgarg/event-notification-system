@@ -2,7 +2,9 @@ import boto3
 import json
 from datetime import datetime
 from models import EventStatus, EventPayload
-
+from event_types import EventType
+from user_types import UserType
+import uuid
 # Configure the LocalStack endpoint
 localstack_endpoint = "http://localhost:4566"
 
@@ -29,13 +31,14 @@ def determine_priority(event_payload):
     Determines if an event is critical based on event attributes.
     """
     # Example priority logic - customize based on your needs
-    critical_events = ['emergency', 'alert', 'critical_update']
-    critical_user_types = ['admin', 'premium']
-    
+    critical_events = [EventType.MENTION, EventType.COMMENT, EventType.REPLY]
+    critical_user_types = [UserType.ADMIN, UserType.PREMIUM]
+    # business logic to determine if an event is critical,
+    # TODO: add more logic here, for example, if the event is a mention, then it is critical
     is_critical = (
-        event_payload.get('event_name', '').lower() in critical_events or
-        event_payload.get('user_type', '').lower() in critical_user_types or
-        event_payload.get('priority', '').lower() == 'high'
+        event_payload.get('event_type', '').lower() in critical_events or
+        event_payload.get('priority', '').lower() == 'high' or
+        event_payload.get('user_type', '').lower() in critical_user_types # TODO: add user type to event payload
     )
     
     return is_critical
@@ -72,7 +75,7 @@ def route_to_notification_queues(event_payload):
     if notification_config.get('push', False):
         queue_url = PUSH_NOTIFICATION_QUEUE if is_critical else PUSH_NOTIFICATION_QUEUE_NON_CRITICAL
         sqs_client.send_message(
-            QueueUrl=queue_url  ,
+            QueueUrl=queue_url,
             MessageBody=message_body
         )
         print(f"Routed to push notification queue: {queue_url}")
@@ -130,14 +133,22 @@ def process_message(message):
     body = json.loads(message['Body'])
     event_payload = json.loads(body['Message'])
 
+    event_id = str(uuid.uuid4())
     # Create an event entry with status START
     event = EventPayload(
-        event_id=event_payload.get('event_id', 'unknown'),
+        event_id=event_id,
         status=EventStatus.START,
-        retry_count=0,
+        retry_count_sms=event_payload.get('retry_count_sms', 0),
+        retry_count_email=event_payload.get('retry_count_email', 0),
+        retry_count_push=event_payload.get('retry_count_push', 0),
         user_id=event_payload.get('user_id', 'unknown'),
-        event_name=event_payload.get('event_name', 'unknown'),
-        payload=event_payload.get('payload', {})
+        event_type=event_payload.get('event_type', EventType.UNKNOWN),
+        payload={
+            "parent_id": event_payload.get('parent_id', 'unknown'),
+            "parent_type": event_payload.get('parent_type', 'unknown'),
+            "timestamp": event_payload.get('timestamp', datetime.now().isoformat()),
+            "priority": event_payload.get('priority', 'normal')
+        }
     )
 
     # Insert the event into the DynamoDB table

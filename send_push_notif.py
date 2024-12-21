@@ -3,12 +3,15 @@ import json
 import asyncio
 import aiohttp
 import logging
+from models import EventStatus
 
 # Configure the LocalStack endpoint
 localstack_endpoint = "http://localhost:4566"
 
 # Initialize AWS clients
 sqs_client = boto3.client('sqs', endpoint_url=localstack_endpoint)
+dynamodb_client = boto3.resource('dynamodb', endpoint_url=localstack_endpoint)
+dynamodb_table = dynamodb_client.Table('event')
 
 # SQS queue URLs
 QUEUE_URL = "http://sqs.us-east-1.localhost.localstack.cloud:4566/000000000000/push_notification_queue"
@@ -38,6 +41,7 @@ async def send_push_notification(client_id, message):
         async with session.post(PUSH_API_URL, headers=headers, json=data) as response:
             if response.status != 200:
                 raise Exception(f"Failed to send push notification: {response.status}")
+            return EventStatus.SUCCESS
 
 def apply_business_logic(event_payload):
     """
@@ -56,16 +60,39 @@ async def process_message(message):
     body = json.loads(message['Body'])
     event_payload = json.loads(body['Message'])
 
+    event_id = event_payload.get('event_id')
     target_clients = apply_business_logic(event_payload)
     notification_message = f"Event {event_payload.get('event_name', 'unknown')} occurred."
 
+    # Update DynamoDB to IN_PROGRESS status
+    dynamodb_table.update_item(
+        Key={'event_id': event_id},
+        UpdateExpression='SET #status = :status',
+        ExpressionAttributeNames={'#status': 'status'},
+        ExpressionAttributeValues={':status': EventStatus.IN_PROGRESS}
+    )
+
+    success = True
     for client_id in target_clients:
         try:
-            await send_push_notification(client_id, notification_message)
+            status = await send_push_notification(client_id, notification_message)
             logging.info(f"Push notification sent to client {client_id}")
         except Exception as e:
             logging.error(f"Error sending push notification to client {client_id}: {e}")
-            # Optionally, handle retries or log to a DLQ
+            success = False
+
+    # Update final status in DynamoDB
+    final_status = EventStatus.SUCCESS if success else EventStatus.FAILED
+    dynamodb_table.update_item(
+        Key={'event_id': event_id},
+        UpdateExpression='SET #status = :status',
+        ExpressionAttributeNames={'#status': 'status'},
+        ExpressionAttributeValues={':status': final_status}
+    )
+
+    # If failed, send to DLQ
+    if not success:
+        sqs_client.send_message(QueueUrl=DLQ_URL, MessageBody=json.dumps(event_payload))
 
 async def listen_to_sqs():
     """

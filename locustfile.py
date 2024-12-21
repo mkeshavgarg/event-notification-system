@@ -1,5 +1,5 @@
 from locust import HttpUser, task, between
-
+from datetime import datetime
 class EventPublisherUser(HttpUser):
     wait_time = between(1, 2)  # Simulate a wait time between requests
 
@@ -7,10 +7,12 @@ class EventPublisherUser(HttpUser):
     def publish_event(self):
         # Define the payload for the event
         payload = {
-            "event_id": "test_event",
+            "parent_id": "post_67890",
+            "parent_type": "post", 
             "user_id": "user_123",
-            "event_name": "test_event_name",
-            "payload": {"key": "value"}
+            "event_type": "LIKE",
+            "timestamp": datetime.now().isoformat(),
+            "priority": "normal"
         }
         # Send a POST request to the publish_event endpoint
-        self.client.post("/events/test_event", json=payload) 
+        self.client.post("/event", json=payload) 

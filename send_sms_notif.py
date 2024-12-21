@@ -4,6 +4,7 @@ import asyncio
 import aiohttp
 import logging
 from botocore.exceptions import ClientError
+from models import EventStatus
 
 # Configure the LocalStack endpoint
 localstack_endpoint = "http://localhost:4566"
@@ -42,6 +43,7 @@ async def send_sms(to_number, message):
         async with session.post(url, auth=auth, data=data) as response:
             if response.status != 201:
                 raise Exception(f"Failed to send SMS: {response.status}")
+            return EventStatus.SUCCESS
 
 async def update_dynamodb_status(message_id, status, retry_count):
     """
@@ -76,22 +78,30 @@ async def process_message(message):
     max_retries = 5
     backoff_factor = 2
 
+    # First update DynamoDB to IN_PROGRESS status
+    await update_dynamodb_status(message_id, EventStatus.IN_PROGRESS, retry_count)
+
     while retry_count < max_retries:
         try:
-            await send_sms(to_number, sms_message)
-            await update_dynamodb_status(message_id, 'SUCCESS', retry_count)
+            # Attempt to send SMS and await the response
+            status = await send_sms(to_number, sms_message)
             logging.info(f"SMS sent to {to_number}")
+            
+            # Only update status after confirmed successful send
+            if status == EventStatus.SUCCESS:
+                await update_dynamodb_status(message_id, EventStatus.SUCCESS, retry_count)
             return
         except Exception as e:
             logging.error(f"Error sending SMS: {e}")
             retry_count += 1
-            await update_dynamodb_status(message_id, 'RETRY', retry_count)
+            await update_dynamodb_status(message_id, EventStatus.RETRY, retry_count)
             await asyncio.sleep(backoff_factor ** retry_count)
 
     # If all retries fail, send the message to the DLQ
     logging.error(f"Failed to send SMS after {max_retries} retries, sending to DLQ")
-    await update_dynamodb_status(message_id, 'FAILED', retry_count)
+    await update_dynamodb_status(message_id, EventStatus.FAILED, retry_count)
     sqs_client.send_message(QueueUrl=DLQ_URL, MessageBody=json.dumps(event_payload))
+
 async def listen_to_sqs_with_priority():
     """
     Continuously listens to both critical and non-critical SQS queues with priority.
