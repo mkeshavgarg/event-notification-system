@@ -87,7 +87,7 @@ notification-system/
 ### Flow Chart
 ```mermaid
 graph TD
-A[Client] -->|POST /event| B[Publish Event API]
+A[Client] -->|POST /publish_events| B[Publish Event API]
 B -->|Batch Events| C[SNS Topic]
 C -->|Fan-out| D[SQS Main Listener]
 D -->|Create Entry| E[DynamoDB]
@@ -105,7 +105,7 @@ I1 & I2 & I3 & J1 & J2 & J3 -->|Process & Send| K[Notification Delivery]
 ```
 
 1. **Event Triggering**
-   - User activity triggers event via POST /event API
+   - User activity triggers event via POST /publish_events API
    - Events are batched and published to SNS topic
 
 2. **Message Processing**
@@ -127,11 +127,11 @@ I1 & I2 & I3 & J1 & J2 & J3 -->|Process & Send| K[Notification Delivery]
 
 ### Publish Event API
 
-The main entry point for triggering notifications is the `/event` endpoint:
+The main entry point for triggering notifications is the `/publish_events` endpoint:
 
 ```bash
 # Using curl
-curl -X POST http://localhost:8000/event \
+curl -X POST http://localhost:8000/publish_events \
   -H "Content-Type: application/json" \
   -d '{
     "user_id": "user_12345",
