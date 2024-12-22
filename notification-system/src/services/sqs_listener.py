@@ -29,7 +29,7 @@ def determine_priority(event_payload):
     # TODO: add more logic here, for example, if the event is a mention, then it is critical
     is_critical = (
         event_payload.get('event_type', '').lower() in critical_events or
-        event_payload.get('priority', '').lower() == 'high' or
+        event_payload.get('priority', '').lower() == 'critical' or
         event_payload.get('user_type', '').lower() in critical_user_types # TODO: add user type to event payload
     )
     
@@ -95,7 +95,6 @@ def route_to_notification_queues(event_payload):
     
     # Convert payload to string for SQS
     message_body = json.dumps({'Message': json.dumps(event_payload)})
-    
     # Route to SMS queues if enabled for user
     if user_prefs.get('sms', False):
         queue_url = QUEUES['sms']['critical']['url'] if is_critical else QUEUES['sms']['non_critical']['url']
