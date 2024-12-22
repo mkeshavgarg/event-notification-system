@@ -1,5 +1,5 @@
 import boto3
-from config import QUEUES, NOTIFICATION_TYPES, PRIORITY_TYPES
+from ..config.settings import QUEUES, NOTIFICATION_TYPES, PRIORITY_TYPES
 
 # Configure the LocalStack endpoint
 localstack_endpoint = "http://localhost:4566"
@@ -85,6 +85,26 @@ def create_user_connections_table():
                 {
                     'AttributeName': 'user_id',
                     'AttributeType': 'S'
+                }
+            ],
+            BillingMode='PAY_PER_REQUEST'
+        )
+        table_status = response['TableDescription']['TableStatus']
+        print("Table status:", table_status)
+    except Exception as e:
+        print(f"Error creating table: {e}")
+
+def create_user_preferences_table():
+    dynamodb = boto3.client('dynamodb', endpoint_url=localstack_endpoint)
+    table_name = "user_preferences"
+
+    try:
+        response = dynamodb.create_table(
+            TableName=table_name,
+            KeySchema=[
+                {
+                    'AttributeName': 'user_id',
+                    'KeyType': 'HASH'
                 }
             ],
             BillingMode='PAY_PER_REQUEST'

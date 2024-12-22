@@ -1,0 +1,26 @@
+{
+  "title": "Notification System Dashboard",
+  "panels": [
+    {
+      "title": "Notification Count by Type",
+      "type": "graph",
+      "metrics": [
+        "notification_count"
+      ]
+    },
+    {
+      "title": "Notification Processing Duration",
+      "type": "graph",
+      "metrics": [
+        "notification_duration"
+      ]
+    },
+    {
+      "title": "Queue Depth",
+      "type": "graph",
+      "metrics": [
+        "queue_depth"
+      ]
+    }
+  ]
+} 

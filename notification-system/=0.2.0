@@ -1,0 +1,13 @@
+Collecting apns2
+  Using cached apns2-0.7.2-py2.py3-none-any.whl.metadata (850 bytes)
+Requirement already satisfied: hyper>=0.7 in /home/hp/Downloads/python-sample-vscode-fastapi-tutorial-main/venv/lib/python3.12/site-packages (from apns2) (0.7.0)
+Requirement already satisfied: PyJWT<2.0.0,>=1.4.0 in /home/hp/Downloads/python-sample-vscode-fastapi-tutorial-main/venv/lib/python3.12/site-packages (from apns2) (1.7.1)
+Requirement already satisfied: cryptography>=1.7.2 in /home/hp/Downloads/python-sample-vscode-fastapi-tutorial-main/venv/lib/python3.12/site-packages (from apns2) (41.0.4)
+Requirement already satisfied: cffi>=1.12 in /home/hp/Downloads/python-sample-vscode-fastapi-tutorial-main/venv/lib/python3.12/site-packages (from cryptography>=1.7.2->apns2) (1.16.0)
+Requirement already satisfied: h2<3.0,>=2.4 in /home/hp/Downloads/python-sample-vscode-fastapi-tutorial-main/venv/lib/python3.12/site-packages (from hyper>=0.7->apns2) (2.6.2)
+Requirement already satisfied: hyperframe<4.0,>=3.2 in /home/hp/Downloads/python-sample-vscode-fastapi-tutorial-main/venv/lib/python3.12/site-packages (from hyper>=0.7->apns2) (3.2.0)
+Requirement already satisfied: pycparser in /home/hp/Downloads/python-sample-vscode-fastapi-tutorial-main/venv/lib/python3.12/site-packages (from cffi>=1.12->cryptography>=1.7.2->apns2) (2.21)
+Requirement already satisfied: hpack<4,>=2.2 in /home/hp/Downloads/python-sample-vscode-fastapi-tutorial-main/venv/lib/python3.12/site-packages (from h2<3.0,>=2.4->hyper>=0.7->apns2) (3.0.0)
+Using cached apns2-0.7.2-py2.py3-none-any.whl (10.0 kB)
+Installing collected packages: apns2
+Successfully installed apns2-0.7.2

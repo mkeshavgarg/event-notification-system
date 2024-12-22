@@ -8,6 +8,7 @@ from fastapi import FastAPI, HTTPException, Request, BackgroundTasks, WebSocket,
 from botocore.config import Config
 from typing import List, Dict
 from itertools import islice
+import time
 
 # Use relative imports
 from ..models.event import EventPayload
@@ -18,12 +19,16 @@ from ..config.settings import (
     LOCALSTACK_ENDPOINT,
     DYNAMODB_TABLE_NAME
 )
+from ..config.telemetry import setup_telemetry
 
 app = FastAPI(
     title="Notification System API",
     description="Event-driven notification system for handling multi-channel notifications",
     version="1.0.0"
 )
+
+# Setup telemetry
+metrics = setup_telemetry(app)
 
 # Configure retry settings
 boto_config = Config(
@@ -98,21 +103,49 @@ async def publish_events(payloads: List[dict], background_tasks: BackgroundTasks
     5. Scalability: Leverages AWS SNS's inherent scalability and FastAPI's concurrency capabilities.
 
     Args:
-        payloads (List[dict]): A list of event payloads. Client side buffering can be used to batch the payloads before sending to the API.
+        payloads (List[dict]): A list of event payloads. Client side buffering can be used to batch the payloads.
         background_tasks (BackgroundTasks): FastAPI background task manager.
 
     Returns:
         dict[str, str]: A result message indicating the request was received.
     """
-    async def publish_to_sns_batch(batch: List[dict]):
-        for payload in batch:
-            await publish_to_sns(payload)
+    try:
+        batch_count = 0
+        start_time = time.time()
+        
+        async def publish_to_sns_batch(batch: List[dict]):
+            for payload in batch:
+                try:
+                    await publish_to_sns(payload)
+                    # Record individual notification metrics
+                    metrics["notification_counter"].add(1, {
+                        "type": payload.get('event_type', 'UNKNOWN'),
+                        "priority": payload.get('payload', {}).get('priority', 'non_critical')
+                    })
+                except Exception as e:
+                    logger.error(f"Failed to publish event in batch: {str(e)}")
+                    # You might want to add error metrics here
+                    continue
 
-    # Process payloads in chunks of 10
-    for batch in chunked_iterable(payloads, 10):
-        background_tasks.add_task(publish_to_sns_batch, batch)
+        # Process payloads in chunks of 10
+        for batch in chunked_iterable(payloads, 10):
+            background_tasks.add_task(publish_to_sns_batch, batch)
+            batch_count += 1
 
-    return {"result": f"{len(payloads)} events received and will be processed in batches."}
+        # Convert processing_duration to string to match response type
+        processing_duration = str(round((time.time() - start_time) * 1000, 2))
+        metrics["notification_duration"].record(
+            float(processing_duration),  # Convert back to float for metrics
+            {"batch_size": str(len(payloads)), "batch_count": str(batch_count)}
+        )
+
+        return {
+            "result": f"{len(payloads)} events received and will be processed in {batch_count} batches.",
+            "processing_time_ms": processing_duration  # Now returns string
+        }
+    except Exception as e:
+        logger.error(f"Error in batch event publishing: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/events")
 def fetch_events(filter_key: str, filter_value: str) -> dict[str, list[EventPayload]]:

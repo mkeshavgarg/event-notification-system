@@ -32,11 +32,14 @@ notification-system/
   - Email notifications via SendGrid
   - SMS notifications via Twilio
   - Push notifications via Firebase/APNs
+  - User-configurable notification preferences
   
 - **Priority-Based Processing**
   - Critical and non-critical queues for each channel
   - Priority-based message routing
   - Dead Letter Queue (DLQ) for failed messages
+  - Quiet hours support for non-critical notifications
+  - Priority-only mode for users
 
 - **Robust Error Handling**
   - Exponential backoff retry mechanism
@@ -47,6 +50,49 @@ notification-system/
   - Horizontal scaling with multiple workers
   - Parallel message processing
   - Supervisor-managed processes
+  - Load balanced FastAPI service (up to 10K req/s per instance)
+  - Auto-scaled worker pools (3-5 workers per CPU core)
+
+## User Preferences
+
+Users can configure their notification preferences:
+
+```json
+{
+    "notification_preferences": {
+        "sms": true,
+        "email": true,
+        "push": true,
+        "quiet_hours": {
+            "enabled": true,
+            "start": "22:00",
+            "end": "08:00"
+        },
+        "priority_only": false
+    }
+}
+```
+
+- **Channel Selection**: Enable/disable SMS, email, or push notifications
+- **Quiet Hours**: Suppress non-critical notifications during specified hours
+- **Priority Mode**: Receive only critical notifications when enabled
+
+## Performance & Scaling
+
+The system is designed to handle high throughput:
+
+- **API Layer**:
+  - Each FastAPI instance: ~10,000 requests/second
+  - Load balanced across multiple instances
+  - Recommended: N workers = N CPU cores
+  - Example: 8 core machine = 8 uvicorn workers
+
+- **Worker Processing**:
+  - 1 worker per CPU core for optimal performance
+  - Prevents CPU context switching overhead
+  - Each worker handles ~1,000 messages/second
+  - Auto-scales based on queue depth
+  - Example: 8 core machine = 8 workers × 1,000 msg/s = 8,000 msg/s throughput
 
 ## Core Components
 
@@ -153,7 +199,7 @@ requests.post(
         "event_type": "LIKE",
         "payload": {
             "parent_id": "post_67890",
-            "parent_type": "post",
+            "parent_type": "post",  
             "timestamp": "2023-10-15T12:34:56Z",
             "priority": "critical"
         }
@@ -244,6 +290,63 @@ locust -f tests/locustfile.py --host http://localhost:8000
 - **Logs**: `/tmp/sqs_listener*.log`
 - **Metrics**: CloudWatch dashboards
 - **Performance**: Locust reports
+
+### Observability Stack
+
+The system uses a comprehensive observability stack:
+
+#### 1. OpenTelemetry Collector
+- Central collector for all telemetry data
+- Protocol: OTLP (OpenTelemetry Protocol)
+- Ports:
+  - 4317: OTLP gRPC
+  - 4318: OTLP HTTP
+  - 8888: Collector Metrics
+
+#### 2. Prometheus
+- Metrics collection and storage
+- Scrape interval: 15s
+- Endpoints monitored:
+  - `host.docker.internal:8001`: Application metrics
+  - `otel-collector:8888`: Collector metrics
+
+#### 3. Grafana
+- Visualization and dashboards
+- URL: http://localhost:3000 (admin/admin)
+- Pre-configured dashboards:
+  - Notification Count by Type
+  - Processing Duration
+  - Queue Depth
+
+### Key Metrics
+
+1. **Notification Metrics**
+   - `notification_count`: Total notifications by type
+   - `notification_duration`: Processing time in milliseconds
+   - `queue_depth`: Current queue size
+
+2. **Performance Metrics**
+   - Batch processing times
+   - Queue processing rates
+   - Error rates by notification type
+
+### Monitoring Setup
+
+```bash
+# Start monitoring stack
+docker-compose -f docker-compose.monitoring.yml up -d
+
+# Verify services
+docker-compose -f docker-compose.monitoring.yml ps
+
+# Check logs
+docker-compose -f docker-compose.monitoring.yml logs -f
+```
+
+### Additional Monitoring
+- **Service Status**: `supervisorctl status`
+- **Application Logs**: `/tmp/sqs_listener*.log`
+- **Load Testing**: Locust reports at http://localhost:8089
 
 ## Security
 

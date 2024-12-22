@@ -19,3 +19,12 @@ uvicorn==0.23.2
 supervisor
 boto3
 locust
+aiohttp
+aioapns
+opentelemetry-api==1.21.0
+opentelemetry-sdk==1.21.0
+opentelemetry-instrumentation-fastapi==0.42b0
+opentelemetry-exporter-prometheus==1.12.0rc1
+opentelemetry-exporter-otlp==1.21.0
+prometheus-client==0.17.1
+grafana-dashboard-builder==0.6.0a1

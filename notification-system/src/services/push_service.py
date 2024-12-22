@@ -3,10 +3,8 @@ import json
 import asyncio
 import aiohttp
 import logging
-from models import EventStatus
-from apns2.client import APNsClient
-from apns2.payload import Payload
-from apns2.credentials import TokenCredentials
+from ..models.event import EventStatus
+from aioapns import APNs, NotificationRequest, PushType
 from datetime import datetime
 
 
@@ -31,24 +29,29 @@ async def send_ios_push(device_token, message):
     Sends push notification to iOS devices using APNs
     """
     try:
-        credentials = TokenCredentials(
-            auth_key_path=APNS_AUTH_KEY_PATH,
-            auth_key_id=APNS_KEY_ID,
-            team_id=APNS_TEAM_ID
-        )
-        client = APNsClient(credentials=credentials, use_sandbox=False)
-        
-        payload = Payload(
-            alert=message,
-            sound="default",
-            badge=1
+        # Initialize APNs client with key file
+        apns = APNs(
+            key=APNS_AUTH_KEY_PATH,
+            key_id=APNS_KEY_ID,
+            team_id=APNS_TEAM_ID,
+            topic=APNS_TOPIC,
+            use_sandbox=False
         )
         
-        client.send_notification(
-            device_token,
-            payload,
-            APNS_TOPIC
+        # Create notification request
+        notification = NotificationRequest(
+            device_token=device_token,
+            message={
+                "aps": {
+                    "alert": message,
+                    "sound": "default",
+                    "badge": 1
+                }
+            }
         )
+        
+        # Send the notification
+        await apns.send_notification(notification)
         return EventStatus.SUCCESS
     except Exception as e:
         logging.error(f"Error sending iOS push: {e}")
