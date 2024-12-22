@@ -14,7 +14,8 @@ dynamodb_client = boto3.resource('dynamodb', endpoint_url=localstack_endpoint)
 dynamodb_table = dynamodb_client.Table('event')
 
 # SQS queue URLs
-QUEUE_URL = "http://sqs.us-east-1.localhost.localstack.cloud:4566/000000000000/push_notification_queue"
+CRITICAL_QUEUE_URL = "http://sqs.us-east-1.localhost.localstack.cloud:4566/000000000000/push_notification_critical"
+NON_CRITICAL_QUEUE_URL = "http://sqs.us-east-1.localhost.localstack.cloud:4566/000000000000/push_notification_non_critical"
 DLQ_URL = "http://sqs.us-east-1.localhost.localstack.cloud:4566/000000000000/dlq"
 
 # Configure logging
@@ -71,28 +72,49 @@ async def process_message(message):
     if not success:
         sqs_client.send_message(QueueUrl=DLQ_URL, MessageBody=json.dumps(event_payload))
 
-async def listen_to_sqs():
+async def listen_to_sqs_priority():
     """
     Continuously listens to the SQS queue and processes messages.
     """
     while True:
         logging.info("Listening to SQS queue...")
-        response = sqs_client.receive_message(
-            QueueUrl=QUEUE_URL,
+        critical_response = sqs_client.receive_message(
+            QueueUrl=CRITICAL_QUEUE_URL,
             MaxNumberOfMessages=1,
             WaitTimeSeconds=10
         )
+        if critical_response.get('Messages', []):
+            logging.info(f"Processing {len(critical_response.get('Messages', []))} critical messages in parallel")
+            # Process messages in parallel, if any error occurs, it will be handled by the error handling in process_and_delete_message
+            tasks = [
+                process_and_delete_message(message, CRITICAL_QUEUE_URL)
+                for message in critical_response.get('Messages', [])
+            ]
+            await asyncio.gather(*tasks)
+            # continue to the next iteration
+            continue
 
-        messages = response.get('Messages', [])
-        for message in messages:
-            try:
-                await process_message(message)
-                sqs_client.delete_message(
-                    QueueUrl=QUEUE_URL,
-                    ReceiptHandle=message['ReceiptHandle']
-                )
-            except Exception as e:
-                logging.error(f"Error processing message: {e}")
+        logging.info("No critical messages found, checking non-critical queue...")
+        non_critical_response = sqs_client.receive_message(
+            QueueUrl=NON_CRITICAL_QUEUE_URL,
+            MaxNumberOfMessages=1,
+            WaitTimeSeconds=10
+        )
+        if non_critical_response.get('Messages', []):
+            messages = non_critical_response.get('Messages', [])
+            tasks = [process_message(message) for message in messages]
+            await asyncio.gather(*tasks)
+            continue
+
+        logging.info("No non-critical messages found, waiting for 1 second...")
+        await asyncio.sleep(1)
+
+async def process_and_delete_message(message, queue_url):
+    try:    
+        await process_message(message)
+        sqs_client.delete_message(QueueUrl=queue_url, ReceiptHandle=message['ReceiptHandle'])
+    except Exception as e:
+        logging.error(f"Error processing message: {e}")
 
 if __name__ == "__main__":
-    asyncio.run(listen_to_sqs())
+    asyncio.run(listen_to_sqs_priority())

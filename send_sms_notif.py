@@ -118,16 +118,17 @@ async def listen_to_sqs_with_priority():
         critical_messages = critical_response.get('Messages', [])
         if critical_messages:
             logging.info(f"Processing {len(critical_messages)} critical messages")
-            for message in critical_messages:
-                try:
-                    await process_message(message)
-                    sqs_client.delete_message(
-                        QueueUrl=CRITICAL_QUEUE_URL,
-                        ReceiptHandle=message['ReceiptHandle']
-                    )
-                except Exception as e:
-                    logging.error(f"Error processing critical message: {e}")
+
+            tasks = [
+                process_and_delete_message(message, CRITICAL_QUEUE_URL)
+                for message in critical_messages
+            ]
+
+            # Process messages in parallel, if any error occurs, it will be handled by the error handling in process_and_delete_message
+            await asyncio.gather(*tasks)
             continue  # Keep processing critical messages if any exist
+
+        # Only check non-critical if no critical messages
 
         # Only check non-critical if no critical messages
         logging.info("Checking non-critical queue...")
@@ -140,18 +141,24 @@ async def listen_to_sqs_with_priority():
         non_critical_messages = non_critical_response.get('Messages', [])
         if non_critical_messages:
             logging.info(f"Processing {len(non_critical_messages)} non-critical messages")
-            for message in non_critical_messages:
-                try:
-                    await process_message(message)
-                    sqs_client.delete_message(
-                        QueueUrl=NON_CRITICAL_QUEUE_URL,
-                        ReceiptHandle=message['ReceiptHandle']
-                    )
-                except Exception as e:
-                    logging.error(f"Error processing non-critical message: {e}")
-
+            tasks = [
+                process_and_delete_message(message, NON_CRITICAL_QUEUE_URL)
+                for message in non_critical_messages
+            ]
+            await asyncio.gather(*tasks)
+    
         # Small delay before next iteration
         await asyncio.sleep(1)
+
+async def process_and_delete_message(message, queue_url):
+    """
+    Process a message and delete it from the queue if successful.
+    """
+    try:
+        await process_message(message)
+        sqs_client.delete_message(QueueUrl=queue_url, ReceiptHandle=message['ReceiptHandle'])
+    except Exception as e:
+        logging.error(f"Error processing message: {e}")
 
 if __name__ == "__main__":
     asyncio.run(listen_to_sqs_with_priority())
