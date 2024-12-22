@@ -86,39 +86,42 @@ notification-system/
 
 ### Flow Chart
 ```mermaid
-graph LR
-    A[Client] -->|POST /event| B[FastAPI]
-    B -->|Publish| C[SNS Topic]
-    C -->|Fan Out| D[SQS Queues]
-    D -->|Critical| E[Priority Queue]
-    D -->|Non-Critical| F[Standard Queue]
-    E --> G[Notification Services]
-    F --> G
-    G -->|Email| H[SendGrid]
-    G -->|SMS| I[Twilio]
-    G -->|Push| J[Firebase/APNs]
-    G -->|Status Update| K[DynamoDB]
-    H & I & J -.->|Failure| L[DLQ]
+graph TD
+A[Client] -->|POST /event| B[Publish Event API]
+B -->|Batch Events| C[SNS Topic]
+C -->|Fan-out| D[SQS Main Listener]
+D -->|Create Entry| E[DynamoDB]
+D -->|Process Event| F[Business Logic]
+F -->|Determine Priority| G{Priority Router}
+G -->|Critical| H1[Critical Queues]
+G -->|Non-Critical| H2[Non-Critical Queues]
+H1 --> I1[SMS Critical]
+H1 --> I2[Email Critical]
+H1 --> I3[Push Critical]
+H2 --> J1[SMS Non-Critical]
+H2 --> J2[Email Non-Critical]
+H2 --> J3[Push Non-Critical]
+I1 & I2 & I3 & J1 & J2 & J3 -->|Process & Send| K[Notification Delivery]
 ```
 
 1. **Event Triggering**
-   - User activity triggers event
-   - Background tasks publish to SNS
+   - User activity triggers event via POST /event API
+   - Events are batched and published to SNS topic
 
 2. **Message Processing**
-   - SNS fans out to SQS queues
-   - Priority-based routing
-   - Batch processing for performance
+   - SQS listener creates initial event entry in DynamoDB
+   - Business logic computes event criticality
+   - Events routed to appropriate priority queues
 
-3. **Notification Delivery**
-   - Channel-specific processing
-   - Third-party API integration
-   - Status tracking in DynamoDB
+3. **Priority-Based Routing**
+   - Separate critical and non-critical queues for each channel (SMS/Email/Push)
+   - Channel-specific processors handle delivery
+   - Status updates tracked in DynamoDB
 
-4. **Error Handling**
-   - Retry mechanisms
-   - DLQ for failed messages
-   - Manual intervention triggers
+4. **Notification Delivery**
+   - Channel-specific services process their respective queues
+   - Delivery via Twilio (SMS), SendGrid (Email), and Firebase/APNs (Push)
+   - Failed deliveries retry with exponential backoff
 
 ## API Usage
 
@@ -270,7 +273,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## Authors
 
-- Initial work - [Your Name]
+- Initial work - Keshav Garg
 
 ## Acknowledgments
 
