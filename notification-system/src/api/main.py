@@ -1,6 +1,7 @@
 import os
 import boto3
 import uuid
+import uvicorn
 import json
 from datetime import datetime
 from fastapi import FastAPI, HTTPException, Request, BackgroundTasks, WebSocket, WebSocketDisconnect
@@ -9,8 +10,9 @@ from typing import List, Dict
 from itertools import islice
 
 # Use relative imports
-from ..models.event import EventPayload, EventStatus
+from ..models.event import EventPayload
 from ..utils.logging import setup_logging
+from ..services.push_service import store_connection
 from ..config.settings import (
     SNS_TOPIC_ARN,
     LOCALSTACK_ENDPOINT,
@@ -38,9 +40,6 @@ dynamodb_table = dynamodb_client.Table(DYNAMODB_TABLE_NAME)
 
 # Setup logging
 logger = setup_logging()
-
-# Store active WebSocket connections
-active_connections: Dict[str, WebSocket] = {}
 
 def chunked_iterable(iterable, size):
     """Yield successive n-sized chunks from iterable."""
@@ -156,56 +155,24 @@ def get_event(event_id: str) -> dict[str, dict]:
         raise HTTPException(status_code=500, detail=str(e))
     
 @app.websocket("/ws/{user_id}")
-async def websocket_endpoint(websocket: WebSocket, user_id: str):
+async def websocket_endpoint(websocket: WebSocket):
     """
     Establishes WebSocket connection for push notifications.
     """
+    # TODO: get user_id from the request headers or from the database 
+    user_id = "123123"
     try:
         await websocket.accept()
-        active_connections[user_id] = websocket
+        await store_connection(user_id, 'web', {'websocket_id': websocket.client.host, 'connection_url': str(websocket.client.url)})
         logger.info(f"WebSocket connection established for user: {user_id}")
         
-        # Store connection info in DynamoDB
-        connection_info = {
-            'user_id': user_id,
-            'connection_time': str(datetime.utcnow()),
-            'client_type': 'web'
-        }
-        dynamodb_table.put_item(Item=connection_info)
-        
-        try:
-            while True:
-                data = await websocket.receive_text()
-                await websocket.send_json({
-                    "status": "received",
-                    "message": data
-                })
-                
-        except WebSocketDisconnect:
-            # Clean up on disconnect
-            if user_id in active_connections:
-                del active_connections[user_id]
-            logger.info(f"WebSocket disconnected for user {user_id}")
+        # push notification service is listening to the SQS queue and will send the notification to the client using the websocket_id stored in the database
             
     except Exception as e:
         logger.error(f"Error in WebSocket connection: {e}")
-        if user_id in active_connections:
-            del active_connections[user_id]
+        await delete_connection(user_id, 'web')
         await websocket.close()
 
-async def notify_client(user_id: str, message: dict):
-    """Send notification to a specific client"""
-    if user_id in active_connections:
-        try:
-            websocket = active_connections[user_id]
-            await websocket.send_json(message)
-            logger.info(f"Notification sent to user: {user_id}")
-        except Exception as e:
-            logger.error(f"Error sending notification to user {user_id}: {str(e)}")
-            if user_id in active_connections:
-                del active_connections[user_id]
-
 if __name__ == "__main__":
-    import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
 

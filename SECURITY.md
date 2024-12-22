@@ -1,41 +1,65 @@
-<!-- BEGIN MICROSOFT SECURITY.MD V0.0.9 BLOCK -->
-
-## Security
-
-Microsoft takes the security of our software products and services seriously, which includes all source code repositories managed through our GitHub organizations, which include [Microsoft](https://github.com/Microsoft), [Azure](https://github.com/Azure), [DotNet](https://github.com/dotnet), [AspNet](https://github.com/aspnet) and [Xamarin](https://github.com/xamarin).
-
-If you believe you have found a security vulnerability in any Microsoft-owned repository that meets [Microsoft's definition of a security vulnerability](https://aka.ms/security.md/definition), please report it to us as described below.
+# Security Policy
 
 ## Reporting Security Issues
 
-**Please do not report security vulnerabilities through public GitHub issues.**
+**Do not report security vulnerabilities through public GitHub issues.**
 
-Instead, please report them to the Microsoft Security Response Center (MSRC) at [https://msrc.microsoft.com/create-report](https://aka.ms/security.md/msrc/create-report).
+Please report security vulnerabilities by emailing:
+- Primary: security@your-domain.com
+- Secondary: admin@your-domain.com
 
-If you prefer to submit without logging in, send email to [secure@microsoft.com](mailto:secure@microsoft.com).  If possible, encrypt your message with our PGP key; please download it from the [Microsoft Security Response Center PGP Key page](https://aka.ms/security.md/msrc/pgp).
+Include:
+- Issue type (XSS, SQL injection, etc.)
+- Full paths of affected files
+- Steps to reproduce
+- Potential impact
+- Proof of concept (if possible)
 
-You should receive a response within 24 hours. If for some reason you do not, please follow up via email to ensure we received your original message. Additional information can be found at [microsoft.com/msrc](https://www.microsoft.com/msrc). 
+## Token & Credentials Security
 
-Please include the requested information listed below (as much as you can provide) to help us better understand the nature and scope of the possible issue:
+Store sensitive credentials using:
+1. AWS Secrets Manager or AWS Parameter Store for production
+2. HashiCorp Vault for enterprise deployments
+3. Azure Key Vault for Microsoft Azure deployments
+4. Environment variables (.env) for local development only
 
-  * Type of issue (e.g. buffer overflow, SQL injection, cross-site scripting, etc.)
-  * Full paths of source file(s) related to the manifestation of the issue
-  * The location of the affected source code (tag/branch/commit or direct URL)
-  * Any special configuration required to reproduce the issue
-  * Step-by-step instructions to reproduce the issue
-  * Proof-of-concept or exploit code (if possible)
-  * Impact of the issue, including how an attacker might exploit the issue
+Current sensitive tokens in the codebase that need secure storage:
+- `TWILIO_ACCOUNT_SID`
+- `TWILIO_AUTH_TOKEN`
+- `SENDGRID_API_KEY`
+- `APNS_KEY_ID`
+- `APNS_TEAM_ID`
+- `APNS_AUTH_KEY_PATH`
 
-This information will help us triage your report more quickly.
+Never commit tokens, API keys, or credentials to version control.
 
-If you are reporting for a bug bounty, more complete reports can contribute to a higher bounty award. Please visit our [Microsoft Bug Bounty Program](https://aka.ms/security.md/msrc/bounty) page for more details about our active programs.
+## Security Best Practices
 
-## Preferred Languages
+1. Keep dependencies updated
+2. Enable 2FA for all team members
+3. Regular security audits
+4. Follow the principle of least privilege
+5. Implement rate limiting
+6. Use proper input validation
+7. Enable audit logging
 
-We prefer all communications to be in English.
+## Supported Versions
 
-## Policy
+| Version | Supported          |
+| ------- | ------------------ |
+| 1.0.x   | :white_check_mark: |
+| < 1.0   | :x:                |
 
-Microsoft follows the principle of [Coordinated Vulnerability Disclosure](https://aka.ms/security.md/cvd).
+## Security Headers
 
-<!-- END MICROSOFT SECURITY.MD BLOCK -->
+Ensure all API endpoints implement:
+- CORS policies
+- CSP (Content Security Policy)
+- HSTS (HTTP Strict Transport Security)
+- XSS Protection headers
+- Rate limiting headers
+
+## Contact
+
+For non-vulnerability related security questions:
+security-team@your-domain.com
