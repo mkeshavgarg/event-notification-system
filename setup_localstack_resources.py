@@ -68,6 +68,32 @@ def create_dynamodb_table():
     except Exception as e:
         print(f"Error creating table: {e}")
 
+def create_user_connections_table():
+    dynamodb = boto3.client('dynamodb', endpoint_url=localstack_endpoint)
+    table_name = "user_connections"
+
+    try:
+        response = dynamodb.create_table(
+            TableName=table_name,
+            KeySchema=[
+                {
+                    'AttributeName': 'user_id',
+                    'KeyType': 'HASH'
+                }
+            ],
+            AttributeDefinitions=[
+                {
+                    'AttributeName': 'user_id',
+                    'AttributeType': 'S'
+                }
+            ],
+            BillingMode='PAY_PER_REQUEST'
+        )
+        table_status = response['TableDescription']['TableStatus']
+        print("Table status:", table_status)
+    except Exception as e:
+        print(f"Error creating table: {e}")
+
 # Create an SNS topic
 def create_sns_topic():
     sns = boto3.client('sns', endpoint_url=localstack_endpoint)

@@ -4,7 +4,7 @@ import asyncio
 import aiohttp
 import logging
 from models import EventStatus
-
+from push_notif_service import send_push_notification
 # Configure the LocalStack endpoint
 localstack_endpoint = "http://localhost:4566"
 
@@ -17,31 +17,8 @@ dynamodb_table = dynamodb_client.Table('event')
 QUEUE_URL = "http://sqs.us-east-1.localhost.localstack.cloud:4566/000000000000/push_notification_queue"
 DLQ_URL = "http://sqs.us-east-1.localhost.localstack.cloud:4566/000000000000/dlq"
 
-# Push Notification Service API credentials
-PUSH_API_URL = 'https://api.pushservice.com/send'
-PUSH_API_KEY = 'your_push_service_api_key'
-
 # Configure logging
 logging.basicConfig(level=logging.INFO)
-
-async def send_push_notification(client_id, message):
-    """
-    Sends a push notification using a hypothetical push notification service.
-    """
-    headers = {
-        "Authorization": f"Bearer {PUSH_API_KEY}",
-        "Content-Type": "application/json"
-    }
-    data = {
-        "client_id": client_id,
-        "message": message
-    }
-
-    async with aiohttp.ClientSession() as session:
-        async with session.post(PUSH_API_URL, headers=headers, json=data) as response:
-            if response.status != 200:
-                raise Exception(f"Failed to send push notification: {response.status}")
-            return EventStatus.SUCCESS
 
 def apply_business_logic(event_payload):
     """
