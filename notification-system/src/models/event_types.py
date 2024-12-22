@@ -9,3 +9,5 @@ class EventType(str, Enum):
     MENTION = "MENTION"
     MESSAGE = "MESSAGE"
     POST = "POST"
+    UNKNOWN = "UNKNOWN"
+    REPLY = "REPLY"

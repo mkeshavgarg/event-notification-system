@@ -32,6 +32,10 @@ QUEUES = {
             "name": "push_notification_queue_non_critical",
             "url": "http://sqs.us-east-1.localhost.localstack.cloud:4566/000000000000/push_notification_queue_non_critical"
         }
+    },
+    "dlq": {
+        "name": "dlq",
+        "url": "http://sqs.us-east-1.localhost.localstack.cloud:4566/000000000000/dlq"
     }
 }
 
@@ -42,3 +46,9 @@ NOTIFICATION_TYPES = ["sms", "email", "push_notification"]
 
 # TODO: add more priority types
 PRIORITY_TYPES = ["critical", "non_critical"]
+
+LOCALSTACK_ENDPOINT = "http://localhost:4566"
+
+DYNAMODB_TABLE_NAME = "event"
+
+WEBSOCKET_TABLE_NAME = "websocket_connections"

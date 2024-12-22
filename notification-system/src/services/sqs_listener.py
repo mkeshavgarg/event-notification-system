@@ -1,30 +1,16 @@
 import boto3
 import json
 from datetime import datetime
-from models import EventStatus, EventPayload
-from event_types import EventType
-from user_types import UserType
+from src.models.event import EventStatus, EventPayload
+from src.models.event_types import EventType
+from src.models.user_types import UserType
+from src.config.settings import QUEUES, LOCALSTACK_ENDPOINT
 import uuid
-# Configure the LocalStack endpoint
-localstack_endpoint = "http://localhost:4566"
 
 # Initialize AWS clients
-sqs_client = boto3.client('sqs', endpoint_url=localstack_endpoint)
-dynamodb_client = boto3.resource('dynamodb', endpoint_url=localstack_endpoint)
+sqs_client = boto3.client('sqs', endpoint_url=LOCALSTACK_ENDPOINT)
+dynamodb_client = boto3.resource('dynamodb', endpoint_url=LOCALSTACK_ENDPOINT)
 dynamodb_table = dynamodb_client.Table('event')
-
-# SQS queue URLs
-EVENT_QUEUE_URL = "http://sqs.us-east-1.localhost.localstack.cloud:4566/000000000000/event_queue"
-
-# Notification queue URLs
-SMS_CRITICAL_QUEUE = "http://sqs.us-east-1.localhost.localstack.cloud:4566/000000000000/sms_queue_critical"
-SMS_NON_CRITICAL_QUEUE = "http://sqs.us-east-1.localhost.localstack.cloud:4566/000000000000/sms_queue_non_critical"
-
-EMAIL_CRITICAL_QUEUE = "http://sqs.us-east-1.localhost.localstack.cloud:4566/000000000000/email_queue_critical"
-EMAIL_NON_CRITICAL_QUEUE = "http://sqs.us-east-1.localhost.localstack.cloud:4566/000000000000/email_queue_non_critical"
-
-PUSH_NOTIFICATION_QUEUE = "http://sqs.us-east-1.localhost.localstack.cloud:4566/000000000000/push_notification_queue_critical"
-PUSH_NOTIFICATION_QUEUE_NON_CRITICAL = "http://sqs.us-east-1.localhost.localstack.cloud:4566/000000000000/push_notification_queue_non_critical"
 
 def determine_priority(event_payload):
     """
@@ -55,7 +41,7 @@ def route_to_notification_queues(event_payload):
     
     # Route to SMS queues
     if notification_config.get('sms', False):
-        queue_url = SMS_CRITICAL_QUEUE if is_critical else SMS_NON_CRITICAL_QUEUE
+        queue_url = QUEUES['sms']['critical']['url'] if is_critical else QUEUES['sms']['non_critical']['url']
         sqs_client.send_message(
             QueueUrl=queue_url,
             MessageBody=message_body
@@ -64,7 +50,7 @@ def route_to_notification_queues(event_payload):
     
     # Route to email queues
     if notification_config.get('email', False):
-        queue_url = EMAIL_CRITICAL_QUEUE if is_critical else EMAIL_NON_CRITICAL_QUEUE
+        queue_url = QUEUES['email']['critical']['url'] if is_critical else QUEUES['email']['non_critical']['url']
         sqs_client.send_message(
             QueueUrl=queue_url,
             MessageBody=message_body
@@ -73,7 +59,7 @@ def route_to_notification_queues(event_payload):
     
     # Route to push notification queue
     if notification_config.get('push', False):
-        queue_url = PUSH_NOTIFICATION_QUEUE if is_critical else PUSH_NOTIFICATION_QUEUE_NON_CRITICAL
+        queue_url = QUEUES['push_notification']['critical']['url'] if is_critical else QUEUES['push_notification']['non_critical']['url']
         sqs_client.send_message(
             QueueUrl=queue_url,
             MessageBody=message_body
@@ -88,7 +74,7 @@ def listen_to_sqs():
         # Receive messages from the SQS queue in batches
         print("Listening to SQS queue...")
         response = sqs_client.receive_message(
-            QueueUrl=EVENT_QUEUE_URL,
+            QueueUrl=QUEUES['event']['url'],
             MaxNumberOfMessages=10,  # Increased to process up to 10 messages at once
             WaitTimeSeconds=20  # Increased wait time since we're processing in batches
         )
@@ -116,7 +102,7 @@ def listen_to_sqs():
         if entries_to_delete:
             try:
                 sqs_client.delete_message_batch(
-                    QueueUrl=EVENT_QUEUE_URL,
+                    QueueUrl=QUEUES['event']['url'],
                     Entries=entries_to_delete
                 )
             except Exception as e:

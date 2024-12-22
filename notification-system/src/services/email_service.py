@@ -3,27 +3,20 @@ import json
 import asyncio
 import aiohttp
 import logging
-from models import EventStatus
-
-# Configure the LocalStack endpoint
-localstack_endpoint = "http://localhost:4566"
+from src.utils.logging import setup_logging
+from src.models.event import EventStatus
+from src.config.settings import (
+    QUEUES,
+    SENDGRID_API_KEY,
+    LOCALSTACK_ENDPOINT
+)
 
 # Initialize AWS clients
-sqs_client = boto3.client('sqs', endpoint_url=localstack_endpoint)
-dynamodb_client = boto3.resource('dynamodb', endpoint_url=localstack_endpoint)
+sqs_client = boto3.client('sqs', endpoint_url=LOCALSTACK_ENDPOINT)
+dynamodb_client = boto3.resource('dynamodb', endpoint_url=LOCALSTACK_ENDPOINT)
 dynamodb_table = dynamodb_client.Table('event')
 
-# SQS queue URLs
-CRITICAL_QUEUE_URL = "http://sqs.us-east-1.localhost.localstack.cloud:4566/000000000000/email_queue_critical"
-NON_CRITICAL_QUEUE_URL = "http://sqs.us-east-1.localhost.localstack.cloud:4566/000000000000/email_queue_non_critical"
-
-DLQ_URL = "http://sqs.us-east-1.localhost.localstack.cloud:4566/000000000000/dlq"
-
-# SendGrid API key
-SENDGRID_API_KEY = 'your_sendgrid_api_key'
-
-# Configure logging
-logging.basicConfig(level=logging.INFO)
+logger = setup_logging()
 
 async def send_email(to_email, subject, content):
     """
@@ -76,7 +69,7 @@ async def process_message(message):
         try:
             # Attempt to send email and await the response
             status = await send_email(to_email, subject, content)
-            logging.info(f"Email sent to {to_email}")
+            logger.info(f"Email sent to {to_email}")
             
             # Only update status after confirmed successful send
             if status == EventStatus.SUCCESS:
@@ -88,7 +81,7 @@ async def process_message(message):
                 )
             return
         except Exception as e:
-            logging.error(f"Error sending email: {e}")
+            logger.error(f"Error sending email: {e}")
             retry_count += 1
             
             # Update retry count in DynamoDB
@@ -102,7 +95,7 @@ async def process_message(message):
                 await asyncio.sleep(backoff_factor ** retry_count)
 
     # Only update FAILED status after all retries are exhausted
-    logging.error(f"Failed to send email after {max_retries} retries, sending to DLQ")
+    logger.error(f"Failed to send email after {max_retries} retries, sending to DLQ")
     event_payload['retry_count_email'] = retry_count
     
     # Update DynamoDB with failed status
@@ -114,50 +107,7 @@ async def process_message(message):
     )
     
     # Send to DLQ
-    sqs_client.send_message(QueueUrl=DLQ_URL, MessageBody=json.dumps(event_payload))
-
-async def listen_to_sqs_with_priority():
-    """
-    Continuously listens to both critical and non-critical SQS queues with priority,
-    processing messages in parallel within each batch.
-    """
-    while True:
-        # Try critical queue first
-        critical_response = sqs_client.receive_message(
-            QueueUrl=CRITICAL_QUEUE_URL,
-            MaxNumberOfMessages=10,
-            WaitTimeSeconds=5
-        )
-
-        critical_messages = critical_response.get('Messages', [])
-        if critical_messages:
-            logging.info(f"Processing {len(critical_messages)} critical messages in parallel")
-            # Process messages in parallel, if any error occurs, it will be handled by the error handling in process_and_delete_message
-            tasks = [
-                process_and_delete_message(message, CRITICAL_QUEUE_URL)
-                for message in critical_messages
-            ]
-            await asyncio.gather(*tasks)
-            continue
-
-        # Only check non-critical if no critical messages
-        non_critical_response = sqs_client.receive_message(
-            QueueUrl=NON_CRITICAL_QUEUE_URL,
-            MaxNumberOfMessages=10,
-            WaitTimeSeconds=5
-        )
-
-        non_critical_messages = non_critical_response.get('Messages', [])
-        if non_critical_messages:
-            logging.info(f"Processing {len(non_critical_messages)} non-critical messages in parallel")
-            tasks = [
-                process_and_delete_message(message, NON_CRITICAL_QUEUE_URL)
-                for message in non_critical_messages
-            ]
-            # Process messages in parallel, if any error occurs, it will be handled by the error handling in process_and_delete_message
-            await asyncio.gather(*tasks)
-
-        await asyncio.sleep(1)
+    sqs_client.send_message(QueueUrl=QUEUES['dlq']['url'], MessageBody=json.dumps(event_payload))
 
 async def process_and_delete_message(message, queue_url):
     """
@@ -170,7 +120,48 @@ async def process_and_delete_message(message, queue_url):
             ReceiptHandle=message['ReceiptHandle']
         )
     except Exception as e:
-        logging.error(f"Error processing message: {e}")
+        logger.error(f"Error processing message: {e}")
+
+async def listen_to_sqs_with_priority():
+    """
+    Continuously listens to both critical and non-critical SQS queues with priority,
+    processing messages in parallel within each batch.
+    """
+    while True:
+        # Try critical queue first
+        critical_response = sqs_client.receive_message(
+            QueueUrl=QUEUES['email']['critical']['url'],
+            MaxNumberOfMessages=10,
+            WaitTimeSeconds=5
+        )
+
+        critical_messages = critical_response.get('Messages', [])
+        if critical_messages:
+            logger.info(f"Processing {len(critical_messages)} critical messages in parallel")
+            tasks = [
+                process_and_delete_message(message, QUEUES['email']['critical']['url'])
+                for message in critical_messages
+            ]
+            await asyncio.gather(*tasks)
+            continue
+
+        # Only check non-critical if no critical messages
+        non_critical_response = sqs_client.receive_message(
+            QueueUrl=QUEUES['email']['non_critical']['url'],
+            MaxNumberOfMessages=10,
+            WaitTimeSeconds=5
+        )
+
+        non_critical_messages = non_critical_response.get('Messages', [])
+        if non_critical_messages:
+            logger.info(f"Processing {len(non_critical_messages)} non-critical messages in parallel")
+            tasks = [
+                process_and_delete_message(message, QUEUES['email']['non_critical']['url'])
+                for message in non_critical_messages
+            ]
+            await asyncio.gather(*tasks)
+
+        await asyncio.sleep(1)
 
 if __name__ == "__main__":
     asyncio.run(listen_to_sqs_with_priority())

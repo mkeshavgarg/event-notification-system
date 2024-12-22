@@ -4,7 +4,8 @@ import asyncio
 import aiohttp
 import logging
 from botocore.exceptions import ClientError
-from models import EventStatus
+from src.models.event import EventStatus
+from src.config.settings import QUEUES
 
 # Configure the LocalStack endpoint
 localstack_endpoint = "http://localhost:4566"
@@ -15,9 +16,9 @@ dynamodb_client = boto3.resource('dynamodb', endpoint_url=localstack_endpoint)
 dynamodb_table = dynamodb_client.Table('sms_events')
 
 # SQS queue URLs
-CRITICAL_QUEUE_URL = "http://sqs.us-east-1.localhost.localstack.cloud:4566/000000000000/sms_queue_critical"
-NON_CRITICAL_QUEUE_URL = "http://sqs.us-east-1.localhost.localstack.cloud:4566/000000000000/sms_queue_non_critical" 
-DLQ_URL = "http://sqs.us-east-1.localhost.localstack.cloud:4566/000000000000/dlq"
+CRITICAL_QUEUE_URL = QUEUES['sms']['critical']['url']
+NON_CRITICAL_QUEUE_URL = QUEUES['sms']['non_critical']['url'] 
+DLQ_URL = QUEUES['dlq']['url']
 
 # Twilio API credentials
 TWILIO_ACCOUNT_SID = 'your_twilio_account_sid'
