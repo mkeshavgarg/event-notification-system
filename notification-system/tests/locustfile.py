@@ -12,7 +12,7 @@ class EventPublisherUser(HttpUser):
             "user_id": "user_123",
             "event_type": "LIKE",
             "timestamp": datetime.now().isoformat(),
-            "priority": "normal"
+            "priority": "critical"
         }
         # Send a POST request to the publish_event endpoint
-        self.client.post("/event", json=payload) 
+        self.client.post("/publish_events", json=[payload]) 

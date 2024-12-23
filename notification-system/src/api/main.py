@@ -68,7 +68,7 @@ async def publish_to_sns(payload: dict):
                 }
             }
         )
-        logger.info(f"Event published to SNS: {payload.get('event_id')}")
+        logger.info(f"Event published to SNS: {payload.get('event_type')}")
         return response
     except Exception as e:
         logger.error(f"Failed to publish event: {payload}. Error: {str(e)}")
@@ -138,7 +138,7 @@ async def publish_events(payloads: List[dict], background_tasks: BackgroundTasks
             float(processing_duration),  # Convert back to float for metrics
             {"batch_size": str(len(payloads)), "batch_count": str(batch_count)}
         )
-
+        logger.info(f"processing_duration: {processing_duration}")
         return {
             "result": f"{len(payloads)} events received and will be processed in {batch_count} batches.",
             "processing_time_ms": processing_duration  # Now returns string
