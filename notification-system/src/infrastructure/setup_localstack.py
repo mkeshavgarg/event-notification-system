@@ -21,43 +21,11 @@ def create_dynamodb_table():
                 {
                     'AttributeName': 'event_id',
                     'KeyType': 'HASH'
-                },
-                {
-                    'AttributeName': 'status',
-                    'KeyType': 'RANGE'
                 }
             ],
             AttributeDefinitions=[
                 {
                     'AttributeName': 'event_id',
-                    'AttributeType': 'S'
-                },
-                {
-                    'AttributeName': 'status',
-                    'AttributeType': 'S'
-                },
-                {
-                    'AttributeName': 'retry_count_email',
-                    'AttributeType': 'N'
-                },
-                {
-                    'AttributeName': 'retry_count_sms',
-                    'AttributeType': 'N'
-                },
-                {
-                    'AttributeName': 'retry_count_push',
-                    'AttributeType': 'N'
-                },
-                {
-                    'AttributeName': 'payload',
-                    'AttributeType': 'M'
-                },
-                {
-                    'AttributeName': 'user_id',
-                    'AttributeType': 'S'
-                },
-                {
-                    'AttributeName': 'event_type',
                     'AttributeType': 'S'
                 }
             ],

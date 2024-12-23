@@ -139,7 +139,7 @@
   "timepicker": {},
   "timezone": "",
   "title": "Notification System Dashboard",
-  "uid": "notification-system",
+  "uid": "unique-dashboard-uid",
   "version": 1,
   "weekStart": ""
 } 

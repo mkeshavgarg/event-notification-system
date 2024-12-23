@@ -1,5 +1,6 @@
 from opentelemetry import trace, metrics
-from opentelemetry.sdk.trace import TracerProvider, BatchSpanProcessor
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import BatchSpanProcessor
 from opentelemetry.sdk.metrics import MeterProvider
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
@@ -39,6 +40,7 @@ def setup_telemetry(app, service_name="notification-system"):
     metrics.set_meter_provider(meter_provider)
     
     # Start Prometheus HTTP server on a separate port
+    # prometheus is scraping metrics from the otel collector a
     start_http_server(port=8001)  # Metrics endpoint
     
     # Main FastAPI app continues running on port 8000
