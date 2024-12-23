@@ -2,6 +2,7 @@ from locust import HttpUser, task, between
 from datetime import datetime
 class EventPublisherUser(HttpUser):
     wait_time = between(1, 2)  # Simulate a wait time between requests
+    host = "http://localhost:8000"
 
     @task
     def publish_event(self):
