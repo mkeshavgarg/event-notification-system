@@ -1,5 +1,5 @@
 from opentelemetry import trace, metrics
-from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace import TracerProvider, BatchSpanProcessor
 from opentelemetry.sdk.metrics import MeterProvider
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
@@ -28,14 +28,20 @@ def setup_telemetry(app, service_name="notification-system"):
         endpoint="http://localhost:4317",  # OTLP gRPC endpoint
     )
     
+    # Add the OTLP exporter to the tracer provider
+    span_processor = BatchSpanProcessor(otlp_exporter)
+    tracer_provider.add_span_processor(span_processor)
+    
     # Configure metrics
     prometheus_reader = PrometheusMetricReader()
     metric_readers = [prometheus_reader]
     meter_provider = MeterProvider(resource=resource, metric_readers=metric_readers)
     metrics.set_meter_provider(meter_provider)
     
-    # Start Prometheus HTTP server
-    start_http_server(port=8001)
+    # Start Prometheus HTTP server on a separate port
+    start_http_server(port=8001)  # Metrics endpoint
+    
+    # Main FastAPI app continues running on port 8000
     
     # Get meter and create metrics
     meter = metrics.get_meter(__name__)

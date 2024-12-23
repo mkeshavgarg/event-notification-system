@@ -40,6 +40,7 @@ def get_user_preferences(user_id: str) -> Dict:
     Retrieves user notification preferences from DynamoDB.
     Returns default preferences if none found.
     """
+    print(f"Getting user preferences for user {user_id}")
     try:
         # Get user preferences from DynamoDB
         user_prefs_table = dynamodb_client.Table('user_preferences')

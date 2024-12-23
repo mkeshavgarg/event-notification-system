@@ -15,8 +15,7 @@ notification-system/
 │   ├── config/           # Configuration and settings
 │   ├── infrastructure/   # AWS/LocalStack setup
 │   └── utils/            # Shared utilities
-├── tests/                # Test suite
-└── docs/                 # Documentation
+└── tests/                # Test suite with Locust load tests
 ```
 
 ### Key Components
@@ -307,8 +306,8 @@ The system uses a comprehensive observability stack:
 - Metrics collection and storage
 - Scrape interval: 15s
 - Endpoints monitored:
-  - `host.docker.internal:8001`: Application metrics
-  - `otel-collector:8888`: Collector metrics
+  - `notification-system:8001`: Application metrics
+  - `otel-collector:8889`: Collector metrics
 
 #### 3. Grafana
 - Visualization and dashboards

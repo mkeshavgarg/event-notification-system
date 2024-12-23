@@ -109,6 +109,8 @@ async def publish_events(payloads: List[dict], background_tasks: BackgroundTasks
     Returns:
         dict[str, str]: A result message indicating the request was received.
     """
+    # TODO: get user_id from the request headers or from the database 
+    user_id = "123123"
     try:
         batch_count = 0
         start_time = time.time()
@@ -116,6 +118,9 @@ async def publish_events(payloads: List[dict], background_tasks: BackgroundTasks
         async def publish_to_sns_batch(batch: List[dict]):
             for payload in batch:
                 try:
+                    # user_id is required for the sqs listener to fetch user preferences and route the event to the correct queue
+                    payload['user_id'] = user_id
+                    
                     await publish_to_sns(payload)
                     # Record individual notification metrics
                     metrics["notification_counter"].add(1, {

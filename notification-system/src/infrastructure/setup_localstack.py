@@ -107,6 +107,12 @@ def create_user_preferences_table():
                     'KeyType': 'HASH'
                 }
             ],
+            AttributeDefinitions=[
+                {
+                    'AttributeName': 'user_id',
+                    'AttributeType': 'S'
+                }
+            ],
             BillingMode='PAY_PER_REQUEST'
         )
         table_status = response['TableDescription']['TableStatus']
@@ -252,6 +258,10 @@ def setup_autoscaling_for_queue(queue_name):
 if __name__ == "__main__":
     # Create DynamoDB table
     create_dynamodb_table()
+
+    create_user_connections_table()
+
+    create_user_preferences_table()
 
     # Create SNS topic
     topic_arn = create_sns_topic()
